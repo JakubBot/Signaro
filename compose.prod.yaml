@@ -8,15 +8,20 @@ services:
         ENV_VARIABLE: ${ENV_VARIABLE}
         NEXT_PUBLIC_ENV_VARIABLE: ${NEXT_PUBLIC_ENV_VARIABLE}
     restart: always
+
+    init: true
     ports:
       - 3000:3000
     networks:
-      - my_network
+      - frontend
 
   # Add more containers below (nginx, postgres, etc.)
 
+volumes:
+  pgdata:
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
 networks:
-  my_network:
+  frontend:
+  backend:
     # external: true

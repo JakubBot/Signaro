@@ -14,12 +14,14 @@ RUN \
   else echo "Warning: Lockfile not found. It is recommended to commit lockfiles to version control." && yarn install; \
   fi
 
-# Copy config files only (src and public will come from volumes)
+COPY src ./src
+COPY public ./public
 COPY next.config.ts .
 COPY tsconfig.json .
 
-# Enable telemetry for development
-ENV NEXT_TELEMETRY_DISABLED 0
+# Next.js collects compleale tely anonymous telemetry data about general usage. Learn more here: https://nextjs.org/telemetry
+# Uncomment the following line to disable telemetry at run time
+# ENV NEXT_TELEMETRY_DISABLED 1
 
 # Note: Don't expose ports here, Compose will handle that for us
 

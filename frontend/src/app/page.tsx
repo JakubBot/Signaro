@@ -14,8 +14,8 @@ export default function Home() {
           priority
         />
         <ol>
-          <li>Hi world</li>
-          <li>Hi world</li>
+          <li>Hi world, ja co tam</li>
+          <li>{process.env.NEXT_PUBLIC_API_URL}</li>
         </ol>
 
         <div className={styles.ctas}>
