@@ -79,3 +79,6 @@ next-env.d.ts
 
 ### VS Code ###
 /.vscode/
+
+
+ai/app/__pycache__
