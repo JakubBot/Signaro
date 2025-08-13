@@ -1,0 +1,45 @@
+# Ignore target directory where Maven output files are stored
+target/
+
+# Ignore Maven local repository (optional)
+.m2/
+
+# Ignore IntelliJ IDEA project files
+*.iml
+.idea/
+
+# Ignore Eclipse project files
+.project
+.classpath
+.settings/
+
+# Ignore NetBeans project files
+nbproject/
+
+# Ignore Mac OS X folder attributes
+.DS_Store
+
+# Ignore Linux trash files
+.Trash-*
+
+# Ignore node_modules if there's any front-end part
+node_modules/
+
+# Ignore log files
+*.log
+
+# Ignore temporary files
+*.tmp
+*.swp
+*.swo
+
+# Ignore build output
+build/
+
+# Ignore other files that are not needed in the image
+*.bak
+*.old
+
+# Ignore environment files (optional, if you use them)
+.env
+.env.local

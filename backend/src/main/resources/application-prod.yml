@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: backend
+
+  # DevTools wyłączone w produkcji
+  devtools:
+    restart:
+      enabled: false
+
+  # Konfiguracja bazy danych
+  datasource:
+    url: jdbc:postgresql://db:5432/signaro-prod
+    username: myuser1
+    password: secret
+    driver-class-name: org.postgresql.Driver
+
+  # Konfiguracja JPA/Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: validate   # tylko weryfikacja schematu, nie zmienia bazy
+    show-sql: false        # nie pokazuj zapytań SQL w logach produkcyjnych
+    database-platform: org.hibernate.dialect.PostgreSQLDialect

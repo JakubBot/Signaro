@@ -1,7 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# frontend - next.js
+
 # dependencies
-/node_modules
+frontend/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,11 +16,14 @@
 /coverage
 
 # next.js
-/.next/
-/out/
+/frontend/.next/
+/frontend/out/
+/frontend/.vercel/
+/frontend/.next/cache
 
 # production
-/build
+/frontend/dist/
+/frontend/build/
 
 # misc
 .DS_Store
@@ -38,3 +43,39 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backend - spring
+
+/backend/HELP.md
+/backend/target/
+/backend/.mvn/wrapper/maven-wrapper.jar
+!/backend/**/src/main/**/target/
+/backend/**/src/test/**/target/
+
+### STS ###
+/backend/.apt_generated
+/backend/.classpath
+/backend/.factorypath
+/backend/.project
+/backend/.settings
+/backend/.springBeans
+/backend/.sts4-cache
+
+### IntelliJ IDEA ###
+/backend/.idea
+/backend/*.iws
+/backend/*.iml
+/backend/*.ipr
+
+### NetBeans ###
+/backend/nbproject/private/
+/backend/nbbuild/
+/backend/dist/
+/backend/nbdist/
+/backend/.nb-gradle/
+/backend/build/
+!/backend/**/src/main/**/build/
+/backend/**/src/test/**/build/
+
+### VS Code ###
+/.vscode/

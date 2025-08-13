@@ -14,7 +14,7 @@ export default function Home() {
           priority
         />
         <ol>
-          <li>Hi world, ja co tam</li>
+          <li>Hi world, v2</li>
           <li>{process.env.NEXT_PUBLIC_API_URL}</li>
         </ol>
 

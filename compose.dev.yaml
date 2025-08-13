@@ -5,14 +5,10 @@ services:
       context: ./frontend
       dockerfile: docker/dev.Dockerfile
 
-    # Set environment variables directly in the compose file
-    # environment:
-      # ENV_VARIABLE: ${ENV_VARIABLE}
-      # NEXT_PUBLIC_ENV_VARIABLE: ${NEXT_PUBLIC_ENV_VARIABLE}
-    
     environment:
       WATCHPACK_POLLING: true
-
+      # ENV_VARIABLE: ${ENV_VARIABLE}
+      # NEXT_PUBLIC_ENV_VARIABLE: ${NEXT_PUBLIC_ENV_VARIABLE}
     init: true
     # Set environment variables based on the .env file
     env_file:
@@ -23,14 +19,53 @@ services:
       - ./frontend/public:/app/public
       - /app/node_modules
       - /app/.next
-    restart: always
+    restart: unless-stopped
     ports:
       - 3000:3000
     networks:
       - frontend
+    
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: docker/dev.Dockerfile
+    env_file:
+      - .env
+      - .env.dev.local
+    ports:
+      - 8080:8080
+    # environment:
+    # - SPRING_PROFILES_ACTIVE=dev
+    volumes:
+      - ./backend:/app
+      - ~/.m2:/root/.m2
+    networks:
+      - backend
+      - frontend
+    depends_on:
+     - db
 
-  # Add more containers below (nginx, postgres, etc.)
+  db:
+    image: 'postgres:17'
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.dev.local
+    # environment:
+    #   - POSTGRES_DB=${DB_NAME}
+    #   - POSTGRES_USER=${DB_USER}
+    #   - POSTGRES_PASSWORD=${DB_PASSWORD}
+  
+    ports:
+      - '5432:5432'
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+    networks:
+      - backend
 
+volumes:
+  pgdata:
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
 networks:
