@@ -24,7 +24,7 @@ from av import VideoFrame
 app = FastAPI()
 
 # ---------- CONFIG ----------
-SIGNALING_URI = 'ws://localhost:8080/stream?client=python'  # <-- change if different
+SIGNALING_URI = 'ws://backend:8080/stream?client=python'  # <-- change if different
 WAIT_FOR_TRACK_SECONDS = 5  # wait for incoming track before creating answer (seconds)
 RECONNECT_DELAY_SECONDS = 3
 

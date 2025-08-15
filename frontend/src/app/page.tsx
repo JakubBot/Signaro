@@ -79,7 +79,8 @@ export default function Home() {
         }
       };
 
-      wsRef.current = new WebSocket("ws://localhost:8080/stream?client=js"); // signal for spring boot
+      wsRef.current = new WebSocket("ws://backend:8080/stream?client=js"); // signal for spring boot
+      // wsRef.current = new WebSocket("ws://backend:8080/stream?client=js"); // signal for spring boot
 
       wsRef.current.onopen = () => {
         console.log("WebSocket connection established");

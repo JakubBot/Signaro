@@ -31,7 +31,7 @@ public class SignalingHandler extends TextWebSocketHandler {
                 .collect(Collectors.toMap(arr -> arr[0], arr -> arr[1]));
 
         String clientType = params.get("client");
-        System.out.println("clientType" + clientType);
+        System.out.println("clientType " + clientType);
 
         String token = params.get("token");
 //        if (token == null || !mockVerifyJwt(token)) {

@@ -1,5 +1,21 @@
-# Use full JDK image for dev (with tools)
-FROM eclipse-temurin:24-alpine
+FROM eclipse-temurin:24
+# FROM eclipse-temurin:24-alpine
+
+
+RUN apt-get update && \
+    apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     curl \
+#     wget \
+#     git \
+#     vim \
+#     net-tools \
+#     procps \
+#     unzip \
+#     && rm -rf /var/lib/apt/lists/*
+# RUN apk add --no-cache curl # Install curl for health checks
 
 WORKDIR /app
 

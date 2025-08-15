@@ -23,7 +23,10 @@ services:
     ports:
       - 3000:3000
     networks:
-      - frontend
+      - app_network
+    depends_on:
+      backend:
+        condition: service_healthy
     
   backend:
     container_name: backend
@@ -41,16 +44,16 @@ services:
       - ./backend:/app
       - ~/.m2:/root/.m2
     networks:
-      - backend
-      - frontend
+      - app_network
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 5s
-      retries: 10
-      start_period: 10s
-      timeout: 10s
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
     depends_on:
-     - db
+      db:
+        condition: service_healthy
 
   ai:
     build:
@@ -63,11 +66,12 @@ services:
       - 8000:8000
     volumes:
       - ./ai/app:/app/app
+    networks:
+      - app_network
     depends_on:
-      - db
-      - backend:
-          condition: service_healthy
-          restart: true
+      backend:
+        condition: service_healthy
+    # restart: unless-stopped
       
   db:
     image: 'postgres:17'
@@ -79,19 +83,23 @@ services:
     #   - POSTGRES_DB=${DB_NAME}
     #   - POSTGRES_USER=${DB_USER}
     #   - POSTGRES_PASSWORD=${DB_PASSWORD}
-  
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 10
+      timeout: 5s
+
     ports:
       - '5432:5432'
     volumes:
       - "pgdata:/var/lib/postgresql/data"
     networks:
-      - backend
+      - app_network
 
 volumes:
   pgdata:
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
 networks:
-  frontend:
-  backend:
-    # external: true // for now not needed
+  app_network:
+    driver: bridge
