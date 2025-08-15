@@ -43,6 +43,12 @@ services:
     networks:
       - backend
       - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+      timeout: 10s
     depends_on:
      - db
 
@@ -59,6 +65,9 @@ services:
       - ./ai/app:/app/app
     depends_on:
       - db
+      - backend:
+          condition: service_healthy
+          restart: true
       
   db:
     image: 'postgres:17'
