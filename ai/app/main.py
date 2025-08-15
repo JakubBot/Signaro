@@ -16,15 +16,21 @@ import websockets
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
-from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
+from aiortc import (
+    RTCPeerConnection,
+    RTCSessionDescription,
+    MediaStreamTrack,
+    RTCIceCandidate,
+)
 from aiortc.contrib.media import MediaRelay
 from av import VideoFrame
 
-
 app = FastAPI()
 
+
 # ---------- CONFIG ----------
-SIGNALING_URI = 'ws://backend:8080/stream?client=python'  # <-- change if different
+# SIGNALING_URI = "ws://localhost:8080/stream?client=python"  # <-- change if different
+SIGNALING_URI = "ws://backend:8080/stream?client=python"  # <-- change if different
 WAIT_FOR_TRACK_SECONDS = 5  # wait for incoming track before creating answer (seconds)
 RECONNECT_DELAY_SECONDS = 3
 
@@ -35,8 +41,8 @@ GENERATED_VIDEO_HEIGHT = 360
 # ----------------------------
 
 # Global state
-pcs: Dict[str, RTCPeerConnection] = {}                # clientId -> PeerConnection
-pending_ice: Dict[str, List[dict]] = {}               # clientId -> list of pending ICE candidates
+pcs: Dict[str, RTCPeerConnection] = {}  # clientId -> PeerConnection
+pending_ice: Dict[str, List[dict]] = {}  # clientId -> list of pending ICE candidates
 # Maps clientId -> asyncio.Future used to wait for first remote track
 track_waiters: Dict[str, asyncio.Future] = {}
 
@@ -45,6 +51,60 @@ relay = MediaRelay()
 
 
 executor = ThreadPoolExecutor(max_workers=MAX_INFERENCE_WORKERS)
+
+
+class VideoTransformTrack(MediaStreamTrack):
+    kind = "video"
+
+    def __init__(self, track):
+        super().__init__()
+        self.track = track
+
+    async def recv(self):
+        frame = await self.track.recv()
+        img = frame.to_ndarray(format="bgr24")
+
+        # ---- TUTAJ prosta manipulacja ----
+        # przykład: inwersja kolorów
+        img = 255 - img
+
+        # przykład: rozjaśnienie
+        # img = np.clip(img + 50, 0, 255)
+
+        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+        new_frame.pts = frame.pts
+        new_frame.time_base = frame.time_base
+        return new_frame
+
+
+def parse_ice_candidate_string(candidate_string: str) -> dict:
+    """
+    Parse ICE candidate string to extract components.
+    Example: "candidate:842163049 1 udp 1677729535 192.168.1.2 54400 typ srflx..."
+    """
+    parts = candidate_string.split()
+    if len(parts) < 8:
+        raise ValueError(f"Invalid candidate string: {candidate_string}")
+
+    # Parse basic components
+    foundation = parts[0].split(":")[1]  # "candidate:842163049" -> "842163049"
+    component = int(parts[1])
+    protocol = parts[2]
+    priority = int(parts[3])
+    ip = parts[4]
+    port = int(parts[5])
+    candidate_type = parts[7]  # after "typ"
+
+    return {
+        "foundation": foundation,
+        "component": component,
+        "protocol": protocol,
+        "priority": priority,
+        "ip": ip,
+        "port": port,
+        "type": candidate_type,
+    }
+
 
 async def handle_offer(ws, msg):
     """
@@ -74,11 +134,13 @@ async def handle_offer(ws, msg):
     track_waiters[client_id] = waiter
 
     @pc.on("icecandidate")
-    async def on_icecandidate(event): # it is accessible
+    async def on_icecandidate(event):  # it is accessible
         # send local ICE candidate back to Spring with "to": client_id
         if event.candidate is None:
             return
-        out = {"type": "ice", "to": client_id, "candidate": event.candidate.toJSON()}
+
+        candidate = event.candidate.toJSON()
+        out = {"type": "ice", "to": client_id, "candidate": candidate}
         try:
             await ws.send(json.dumps(out))
         except Exception as e:
@@ -112,12 +174,17 @@ async def handle_offer(ws, msg):
         track = await asyncio.wait_for(waiter, timeout=WAIT_FOR_TRACK_SECONDS)
     except asyncio.TimeoutError:
         # no remote track arrived in time -> proceed without echo
-        print(f"[{client_id}] timeout waiting for remote track, will answer without echo")
+        print(
+            f"[{client_id}] timeout waiting for remote track, will answer without echo"
+        )
 
     if track:
         try:
-            relayed = relay.subscribe(track)
-            pc.addTrack(relayed)
+            # here can make manipulation on the track
+            processed_track = VideoTransformTrack(track)
+            pc.addTrack(processed_track)
+            # relayed = relay.subscribe(track)
+            # pc.addTrack(relayed)
             print(f"[{client_id}] added relayed local track (echo)")
         except Exception as e:
             print(f"[{client_id}] error adding relayed track: {e}")
@@ -125,9 +192,29 @@ async def handle_offer(ws, msg):
 
     # Flush any pending ICE candidates
     pending = pending_ice.pop(client_id, [])
-    for cand in pending:
+    for cand_dict in pending:
         try:
-            await pc.addIceCandidate(cand)
+            candidate_string = cand_dict.get("candidate")
+            sdp_mid = cand_dict.get("sdpMid")
+            sdp_mline_index = cand_dict.get("sdpMLineIndex")
+
+            # ✅ Parsuj candidate string ręcznie
+            parsed = parse_ice_candidate_string(candidate_string)
+            # print("candidate_string: ", candidate_string)
+            #  aiortc (Python) and WebRTC API (JavaScript) has different candidate formats
+            ice_candidate = RTCIceCandidate(
+                component=parsed["component"],
+                foundation=parsed["foundation"],
+                ip=parsed["ip"],
+                port=parsed["port"],
+                priority=parsed["priority"],
+                protocol=parsed["protocol"],
+                type=parsed["type"],
+                sdpMid=sdp_mid,
+                sdpMLineIndex=sdp_mline_index,
+            )
+
+            await pc.addIceCandidate(ice_candidate)
         except Exception as e:
             print(f"[{client_id}] addIceCandidate (pending) failed: {e}")
 
@@ -135,29 +222,55 @@ async def handle_offer(ws, msg):
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
-    out = {"type": "answer", "to": client_id, "sdp": {"type": pc.localDescription.type, "sdp": pc.localDescription.sdp}}
+    out = {
+        "type": "answer",
+        "to": client_id,
+        "sdp": {"type": pc.localDescription.type, "sdp": pc.localDescription.sdp},
+    }
     await ws.send(json.dumps(out))
     print(f"[{client_id}] answer sent")
+
 
 async def handle_ice(msg):
     """
     Handle incoming ICE candidate forwarded by Spring.
-    Expect msg: { "type": "ice", "candidate": {...}, "from": "<clientId>" }
+    Expect msg: { "type": "ice", "candidate": "{...}", "from": "<clientId>" }
     """
     client_id = msg.get("from")
-    candidate = msg.get("candidate")
-    if not client_id or not candidate:
+    cand_dict = msg.get("candidate")
+    if not client_id or not cand_dict:
         return
+
+    print(f"[{client_id}] received ICE candidate:", cand_dict)
 
     pc = pcs.get(client_id)
     if pc and pc.remoteDescription and pc.remoteDescription.type:
         try:
-            await pc.addIceCandidate(candidate)
+            candidate_string = cand_dict.get("candidate")
+            sdp_mid = cand_dict.get("sdpMid")
+            sdp_mline_index = cand_dict.get("sdpMLineIndex")
+
+            # ✅ Parsuj candidate string ręcznie
+            parsed = parse_ice_candidate_string(candidate_string)
+            ice_candidate = RTCIceCandidate(
+                component=parsed["component"],
+                foundation=parsed["foundation"],
+                ip=parsed["ip"],
+                port=parsed["port"],
+                priority=parsed["priority"],
+                protocol=parsed["protocol"],
+                type=parsed["type"],
+                sdpMid=sdp_mid,
+                sdpMLineIndex=sdp_mline_index,
+            )
+
+            await pc.addIceCandidate(ice_candidate)
         except Exception as e:
             print(f"[{client_id}] addIceCandidate failed: {e}")
     else:
         # buffer until remoteDescription is set
-        pending_ice.setdefault(client_id, []).append(candidate)
+        pending_ice.setdefault(client_id, []).append(cand_dict)
+
 
 async def handle_close(msg):
     """
@@ -178,6 +291,7 @@ async def handle_close(msg):
     track_waiters.pop(client_id, None)
     print(f"[{client_id}] cleaned up")
 
+
 async def signaling_client_loop():
     """
     Connect to Spring WebSocket and respond to messages forwarded from JS clients.
@@ -195,6 +309,7 @@ async def signaling_client_loop():
                         continue
 
                     mtype = msg.get("type")
+
                     if mtype == "offer":
                         await handle_offer(ws, msg)
                     elif mtype == "ice":
@@ -212,6 +327,7 @@ async def signaling_client_loop():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(signaling_client_loop())
+
 
 @app.get("/")
 async def check_status():

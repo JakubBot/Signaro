@@ -1,7 +1,8 @@
 "use client";
 import Image from "next/image";
 import styles from "./page.module.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { log } from "console";
 
 const servers = {
   iceServers: [
@@ -10,7 +11,8 @@ const servers = {
     },
     // add turn
   ],
-  iceCandidatePoolSize: 2,
+  iceCandidatePoolSize: 20,
+  // iceCandidatePoolSize: 2,
 };
 
 type SignalMsg =
@@ -29,61 +31,87 @@ export default function Home() {
 
   useEffect(() => {
     let localStream: MediaStream | null = null;
-    const pendingCandidates = [];
+
+    const pendingCandidates = []; // queue for pending ICE candidates
+    const outQueue: any[] = []; // queue for outgoing ICE candidates
+
     const startRecording = async () => {
       const remoteStream = new MediaStream();
 
+      // 1) Create PC and register handlers BEFORE any offer
       const pc = new RTCPeerConnection(servers) as RTCPeerConnection;
       pcRef.current = pc;
 
-
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      } catch (err) {
-        console.error("getUserMedia failed", err);
-        return;
-      }
-
-      localStream.getTracks().forEach((track) => {
-        pcRef.current.addTrack(track, localStream);
-      });
-
-      pcRef.current.ontrack = (event) => {
-        console.log('new track', event.track);
+      pc.ontrack = (event) => {
+        console.log("new track", event.track);
         event.streams[0].getTracks().forEach((track) => {
           remoteStream.addTrack(track);
         });
       };
 
-      if (localWebcamRef.current)
-        localWebcamRef.current.srcObject = localStream;
+      // connection state logging
+      pc.onconnectionstatechange = () => {
+        console.log("pc state:", pc.connectionState);
+      };
+
+      pc.onicecandidate = (event) => {
+        // event.candidate === null => gathering finished
+
+        if (event.candidate) {
+          const ci = event.candidate.toJSON();
+
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            console.log("Sending ICE candidate:", ci);
+            wsRef.current.send(JSON.stringify({ type: "ice", candidate: ci }));
+          } else {
+            outQueue.push(ci);
+          }
+        } else {
+          // opcjonalnie poinformuj serwer że ICE gathering się zakończyło
+          // (przydaje się gdy serwer czeka na koniec)
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+              JSON.stringify({ type: "ice", candidate: null })
+            );
+          } else {
+            outQueue.push(null);
+          }
+        }
+      };
+
+      // 2) getUserMedia and add tracks BEFORE createOffer
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+
+        localStream.getTracks().forEach((track) => {
+          pc.addTrack(track, localStream);
+        });
+
+        if (localWebcamRef.current)
+          localWebcamRef.current.srcObject = localStream;
+      } catch (err) {
+        console.error("getUserMedia failed", err);
+        return;
+      }
 
       if (remoteWebcamRef.current)
         remoteWebcamRef.current.srcObject = remoteStream;
 
-      // connection state logging
-      pcRef.current.onconnectionstatechange = () => {
-        console.log("pc state:", pcRef.current.connectionState);
-      };
-
-      pcRef.current.onicecandidate = (event) => {
-        if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
-          console.log("event:", event);
-
-          wsRef.current.send(
-            JSON.stringify({ type: "ice", candidate: event.candidate })
-          );
-        }
-      };
-
-      wsRef.current = new WebSocket("ws://backend:8080/stream?client=js"); // signal for spring boot
-      // wsRef.current = new WebSocket("ws://backend:8080/stream?client=js"); // signal for spring boot
+      // 3) create/open websocket and set onmessage BEFORE sending offer
+      wsRef.current = new WebSocket("ws://localhost:8080/stream?client=js"); // signal for spring boot
 
       wsRef.current.onopen = () => {
         console.log("WebSocket connection established");
+
+        while (outQueue.length > 0) {
+          const candidate = outQueue.shift();
+          if (candidate) {
+            wsRef.current.send(JSON.stringify({ type: "ice", candidate }));
+          }
+        }
       };
 
       wsRef.current.onmessage = async (event) => {
@@ -119,7 +147,7 @@ export default function Home() {
             pendingCandidates.push(candidate);
           } else {
             try {
-              await pcRef.current.addIceCandidate();
+              await pcRef.current.addIceCandidate(candidate);
             } catch (e) {
               console.warn("addIceCandidate error:", e);
             }
@@ -143,11 +171,52 @@ export default function Home() {
   const makeOffer = async () => {
     if (!pcRef.current) return;
 
-    const offer = await pcRef.current.createOffer();
-    await pcRef.current.setLocalDescription(offer);
+    try {
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+      // wysyłamy ofertę natychmiast
+      wsRef.current?.send(
+        JSON.stringify({ type: "offer", sdp: pcRef.current.localDescription })
+      );
+      console.log("offer sent (trickle ICE mode)");
+    } catch (e) {
+      console.error("Failed to create/send offer:", e);
+    }
 
-    wsRef.current?.send(JSON.stringify({ type: "offer", sdp: offer }));
-    console.log("offer sent");
+    // // poczekaj na zakończenie zbierania ICE lub timeout
+    // await new Promise<void>((resolve) => {
+    //   console.log(
+    //     "pcRef.current!.iceGatheringState",
+    //     pcRef.current!.iceGatheringState
+    //   );
+    //   if (pcRef.current!.iceGatheringState === "complete") {
+    //     resolve();
+    //     return;
+    //   }
+
+    //   const timeout = setTimeout(() => {
+    //     console.warn("iceGathering timeout, sending offer anyway");
+    //     pcRef.current?.removeEventListener("icegatheringstatechange", onChange);
+    //     resolve();
+    //   }, 2000); // 2s fallback
+
+    //   function onChange() {
+    //     console.log(
+    //       "pcRef.current!.iceGatheringState",
+    //       pcRef.current!.iceGatheringState
+    //     );
+    //     if (pcRef.current!.iceGatheringState === "complete") {
+    //       clearTimeout(timeout);
+    //       pcRef.current?.removeEventListener(
+    //         "icegatheringstatechange",
+    //         onChange
+    //       );
+    //       resolve();
+    //     }
+    //   }
+
+    //   pcRef.current!.addEventListener("icegatheringstatechange", onChange);
+    // });
   };
 
   return (
