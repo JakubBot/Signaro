@@ -1,0 +1,9 @@
+# All text files use LF in the repository
+* text=auto
+
+# bash scripts always uses lf
+*.sh text eol=lf
+
+# Configuration files e.g. Dockerfile, Maven etc.
+Dockerfile text eol=lf
+*.dockerfile text eol=lf

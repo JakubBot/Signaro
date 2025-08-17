@@ -1,40 +1,27 @@
 FROM eclipse-temurin:24
 # FROM eclipse-temurin:24-alpine
 
-
-RUN apt-get update && \
-    apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     curl \
-#     wget \
-#     git \
-#     vim \
-#     net-tools \
-#     procps \
-#     unzip \
-#     && rm -rf /var/lib/apt/lists/*
-# RUN apk add --no-cache curl # Install curl for health checks
-
 WORKDIR /app
 
-# Kopiuj pliki buildowe i kod źródłowy
-COPY mvnw .
+# Copy build files and source code
+COPY mvnw mvnw
 COPY .mvn .mvn
-COPY pom.xml .
+COPY pom.xml pom.xml
 COPY src src
 
-# Instalacja zależności (optional, można zrobić podczas budowy obrazu)
+RUN apt-get update && apt-get install -y bash dos2unix curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN dos2unix mvnw && chmod +x mvnw
+
 RUN ./mvnw dependency:resolve
 
-# Expose port aplikacji (domyślny Spring Boot)
 EXPOSE 8080
+
+# Fixes problem with mvnw \r ending on linux 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh 
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Start aplikacji w trybie developerskim z hot reload
 CMD ["./mvnw", "spring-boot:run"]
-
-# , "-Dspring-boot.run.profiles=dev", \
-#      "-Dspring.devtools.restart.enabled=true", \
-#      "-Dspring.devtools.livereload.enabled=true", \
-#      "-Dspring.devtools.remote.secret=mysecret"
