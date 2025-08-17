@@ -11,8 +11,7 @@ const servers = {
     },
     // add turn
   ],
-  iceCandidatePoolSize: 20,
-  // iceCandidatePoolSize: 2,
+  iceCandidatePoolSize: 4,
 };
 
 type SignalMsg =
@@ -26,7 +25,7 @@ export default function Home() {
   const wsRef = useRef<WebSocket | null>(null);
   const localWebcamRef = useRef<HTMLVideoElement | null>(null);
   const remoteWebcamRef = useRef<HTMLVideoElement | null>(null);
-
+  const [socketReady, setSocketReady] = useState(false);
   // https://chatgpt.com/c/689dcbe6-468c-832e-aa06-2d382cac3cb6
 
   useEffect(() => {
@@ -38,9 +37,24 @@ export default function Home() {
     const startRecording = async () => {
       const remoteStream = new MediaStream();
 
-      // 1) Create PC and register handlers BEFORE any offer
+      // 1) getUserMedia / Important it has to be first
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      } catch (err) {
+        console.error("getUserMedia failed", err);
+        return;
+      }
+
+      // 2) Create PC and register handlers BEFORE any offer
       const pc = new RTCPeerConnection(servers) as RTCPeerConnection;
       pcRef.current = pc;
+
+      localStream.getTracks().forEach((track) => {
+        pc.addTrack(track, localStream);
+      });
 
       pc.ontrack = (event) => {
         console.log("new track", event.track);
@@ -79,23 +93,8 @@ export default function Home() {
         }
       };
 
-      // 2) getUserMedia and add tracks BEFORE createOffer
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-
-        localStream.getTracks().forEach((track) => {
-          pc.addTrack(track, localStream);
-        });
-
-        if (localWebcamRef.current)
-          localWebcamRef.current.srcObject = localStream;
-      } catch (err) {
-        console.error("getUserMedia failed", err);
-        return;
-      }
+      if (localWebcamRef.current)
+        localWebcamRef.current.srcObject = localStream;
 
       if (remoteWebcamRef.current)
         remoteWebcamRef.current.srcObject = remoteStream;
@@ -105,7 +104,7 @@ export default function Home() {
 
       wsRef.current.onopen = () => {
         console.log("WebSocket connection established");
-
+        setSocketReady(true);
         while (outQueue.length > 0) {
           const candidate = outQueue.shift();
           if (candidate) {
@@ -233,7 +232,7 @@ export default function Home() {
         }}
       ></video>
 
-      <button onClick={makeOffer}>Zrob polaczenie</button>
+      <button onClick={makeOffer} disabled={!socketReady}>Zrob polaczenie</button>
 
       <h2>Remote webcam</h2>
       <video
