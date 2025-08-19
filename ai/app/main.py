@@ -12,6 +12,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
+import cv2
 import websockets
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -25,6 +26,7 @@ from aiortc import (
 from aiortc.contrib.media import MediaRelay
 from av import VideoFrame
 
+import tensorflow as tf
 app = FastAPI()
 
 
@@ -53,6 +55,12 @@ relay = MediaRelay()
 executor = ThreadPoolExecutor(max_workers=MAX_INFERENCE_WORKERS)
 
 
+@tf.function
+def predict_fn(X):
+    return model(X, training=False)
+
+model = tf.keras.models.load_model("app/keras_model.keras")
+
 class VideoTransformTrack(MediaStreamTrack):
     kind = "video"
 
@@ -64,16 +72,27 @@ class VideoTransformTrack(MediaStreamTrack):
         frame = await self.track.recv()
         img = frame.to_ndarray(format="bgr24")
 
-        # ---- TUTAJ prosta manipulacja ----
-        # przykład: inwersja kolorów
-        img = 255 - img
+        img_gray = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+        img_norm = img_gray / 255.0
+        XTest = cv2.resize(img_norm, (28, 28)).reshape(-1, 28, 28, 1)
 
-        # przykład: rozjaśnienie
-        # img = np.clip(img + 50, 0, 255)
+        XTest_tensor = tf.convert_to_tensor(XTest, dtype=tf.float32)
+        predictions = predict_fn(XTest_tensor)
+        predicted_class = tf.argmax(predictions, axis=1).numpy()
+        letters = list("ABCDEFGHIKLMNOPQRSTUVWXY")
+        letter = letters[predicted_class[0]]
 
-        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+        XTest_display = (XTest[0, :, :, 0] * 255).astype(np.uint8)  # float -> uint8
+        XTest_display = cv2.resize(XTest_display, (img.shape[1], img.shape[0]))  # opcjonalnie skalowanie
+        XTest_display = cv2.cvtColor(XTest_display, cv2.COLOR_GRAY2BGR)  # na 3 kanały BGR
+
+        cv2.putText(XTest_display, f"Class: {letter}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        new_frame = VideoFrame.from_ndarray(XTest_display, format="bgr24")
         new_frame.pts = frame.pts
         new_frame.time_base = frame.time_base
+
         return new_frame
 
 

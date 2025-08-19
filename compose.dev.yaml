@@ -71,6 +71,13 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
     # restart: unless-stopped
       
   db:
@@ -79,10 +86,10 @@ services:
     env_file:
       - .env
       - .env.dev.local
-    # environment:
+    environment:
     #   - POSTGRES_DB=${DB_NAME}
-    #   - POSTGRES_USER=${DB_USER}
-    #   - POSTGRES_PASSWORD=${DB_PASSWORD}
+       - POSTGRES_USER=${DB_USER}
+       - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
