@@ -86,10 +86,6 @@ services:
     env_file:
       - .env
       - .env.dev.local
-    environment:
-    #   - POSTGRES_DB=${DB_NAME}
-       - POSTGRES_USER=${DB_USER}
-       - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s

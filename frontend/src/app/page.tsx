@@ -40,7 +40,11 @@ export default function Home() {
       // 1) getUserMedia / Important it has to be first
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: {
+            width: 640,
+            height: 480,
+          },
+          // video:true,
           audio: false,
         });
       } catch (err) {
@@ -232,7 +236,9 @@ export default function Home() {
         }}
       ></video>
 
-      <button onClick={makeOffer} disabled={!socketReady}>Zrob polaczenie</button>
+      <button onClick={makeOffer} disabled={!socketReady}>
+        Zrob polaczenie
+      </button>
 
       <h2>Remote webcam</h2>
       <video

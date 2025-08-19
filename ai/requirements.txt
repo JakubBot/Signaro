@@ -1,3 +1,5 @@
+protobuf==5.28.3
+
 fastapi
 uvicorn[standard]
 aiortc 

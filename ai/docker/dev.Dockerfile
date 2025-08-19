@@ -1,8 +1,8 @@
-FROM tensorflow/tensorflow:latest-gpu
+FROM tensorflow/tensorflow:2.20.0-gpu
 
 WORKDIR /app
 
-# Instalacja bibliotek systemowych potrzebnych dla OpenCV
+# Installation system libraries needed for OpenCV
 RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

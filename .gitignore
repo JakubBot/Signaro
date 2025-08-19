@@ -34,6 +34,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+.env
 # local env files
 .env*.local
 
@@ -81,4 +82,9 @@ next-env.d.ts
 /.vscode/
 
 
+# AI
 ai/app/__pycache__
+
+
+# General
+.idea
