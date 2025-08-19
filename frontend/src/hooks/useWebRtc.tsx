@@ -33,7 +33,6 @@ const UseWebRtc = (): UseWebRtcReturn => {
           video: {
             width: 640,
             height: 480,
-            frameRate: { ideal: 15, max: 30 },
           },
           audio: false,
         });

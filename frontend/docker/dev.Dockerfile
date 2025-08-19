@@ -1,5 +1,3 @@
-# syntax=docker.io/docker/dockerfile:1
-
 FROM node:24-alpine
 
 WORKDIR /app
@@ -14,6 +12,7 @@ RUN \
   else echo "Warning: Lockfile not found. It is recommended to commit lockfiles to version control." && yarn install; \
   fi
 
+COPY tailwind.config.js postcss.config.js ./ 
 COPY src ./src
 COPY public ./public
 COPY next.config.ts .

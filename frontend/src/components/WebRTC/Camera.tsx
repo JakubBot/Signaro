@@ -1,14 +1,31 @@
-
+import { JSX, RefObject } from "react";
+import { clsx } from "clsx";
+import { css } from "@emotion/react";
+import { colorPalette } from "@/components/ui/colorPalette";
+import { Button } from "@/components/ui/button";
+// import { signIcon } from "@/constants/icons";
+interface CameraProps {
+  localWebcamRef: RefObject<HTMLVideoElement | null>;
+  remoteWebcamRef: RefObject<HTMLVideoElement | null>;
+  makeOffer: () => Promise<void>;
+  isConnected: boolean;
+  error: string | null;
+  cameraReady?: boolean;
+}
 
 const Camera = ({
   localWebcamRef,
   remoteWebcamRef,
   makeOffer,
   socketReady,
-}) => {
+}: CameraProps): JSX.Element => {
   return (
     <>
-      <div>
+      <div
+        className={clsx(css`
+          background: ${colorPalette.lightGray};
+        `)}
+      >
         <h2>Local webcam</h2>
         <video
           ref={localWebcamRef}
@@ -21,9 +38,9 @@ const Camera = ({
           }}
         ></video>
 
-        <button onClick={makeOffer} disabled={!socketReady}>
+        <Button onClick={makeOffer} disabled={!socketReady}>
           Zrob polaczenie
-        </button>
+        </Button>
 
         <h2>Remote webcam</h2>
         <video

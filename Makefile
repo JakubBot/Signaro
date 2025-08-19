@@ -10,17 +10,14 @@ stop-dev:
 rebuild-backend-dev:
 	docker compose -f compose.dev.yaml stop backend
 	docker compose -f compose.dev.yaml build backend
-	docker compose -f compose.dev.yaml up backend -d
 
 rebuild-ai-dev:
 	docker compose -f compose.dev.yaml stop ai
 	docker compose -f compose.dev.yaml build ai
-	docker compose -f compose.dev.yaml up ai -d
 
 rebuild-frontend-dev:
 	docker compose -f compose.dev.yaml stop frontend
 	docker compose -f compose.dev.yaml build frontend
-	docker compose -f compose.dev.yaml up frontend -d
 
 rebuild-dev:
 	docker compose -f compose.dev.yaml down

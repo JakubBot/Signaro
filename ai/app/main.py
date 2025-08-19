@@ -67,10 +67,11 @@ class VideoTransformTrack(MediaStreamTrack):
     def __init__(self, track):
         super().__init__()
         self.track = track
-
+        self.counter = 0
+        
     async def recv(self):
         frame = await self.track.recv()
-        
+    
         img = frame.to_ndarray(format="bgr24")
 
         img_gray = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
