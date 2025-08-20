@@ -1,46 +1,21 @@
-"""
-FastAPI + aiortc signaling server + HTTP endpoint to generate video from text.
-- WebSocket /ws: clients register (send {"type":"register","clientId":"..."}) then exchange offer/answer/ice via JSON.
-- POST /generateFromText: server generates a synthetic video track with given text and adds it to client's peer connection,
-  then initiates renegotiation (server creates offer -> client must reply with answer).
-"""
-
 import asyncio
 import json
-import time
-import uuid
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-import cv2
 import websockets
-import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from aiortc import (
     RTCPeerConnection,
     RTCSessionDescription,
     MediaStreamTrack,
-    RTCIceCandidate,
 )
 from aiortc.contrib.media import MediaRelay
-from av import VideoFrame
+from helpers.utils import add_ice_candidate_safe
+from video_transform_track import VideoTransformTrack
+from config import SIGNALING_URI, WAIT_FOR_TRACK_SECONDS, RECONNECT_DELAY_SECONDS
 
-import tensorflow as tf
 app = FastAPI()
 
-
-# ---------- CONFIG ----------
-# SIGNALING_URI = "ws://localhost:8080/stream?client=python"  # <-- change if different
-SIGNALING_URI = "ws://backend:8080/stream?client=python"  # <-- change if different
-WAIT_FOR_TRACK_SECONDS = 5  # wait for incoming track before creating answer (seconds)
-RECONNECT_DELAY_SECONDS = 3
-
-MAX_INFERENCE_WORKERS = 4
-GENERATED_VIDEO_FPS = 15
-GENERATED_VIDEO_WIDTH = 640
-GENERATED_VIDEO_HEIGHT = 360
-# ----------------------------
 
 # Global state
 pcs: Dict[str, RTCPeerConnection] = {}  # clientId -> PeerConnection
@@ -49,97 +24,8 @@ pending_ice: Dict[str, List[dict]] = {}  # clientId -> list of pending ICE candi
 track_waiters: Dict[str, asyncio.Future] = {}
 
 
-relay = MediaRelay()
 
 
-executor = ThreadPoolExecutor(max_workers=MAX_INFERENCE_WORKERS)
-
-
-@tf.function
-def predict_fn(X):
-    return model(X, training=False)
-
-model = tf.keras.models.load_model("app/keras_model.keras")
-
-class VideoTransformTrack(MediaStreamTrack):
-    kind = "video"
-
-    def __init__(self, track):
-        super().__init__()
-        self.track = track
-        self.counter = 0
-        
-    async def recv(self):
-        frame = await self.track.recv()
-    
-        img = frame.to_ndarray(format="bgr24")
-
-        img_gray = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-        img_norm = img_gray / 255.0
-        XTest = cv2.resize(img_norm, (28, 28)).reshape(-1, 28, 28, 1)
-
-        XTest_tensor = tf.convert_to_tensor(XTest, dtype=tf.float32)
-        predictions = predict_fn(XTest_tensor)
-        predicted_class = tf.argmax(predictions, axis=1).numpy()
-        letters = list("ABCDEFGHIKLMNOPQRSTUVWXY")
-        letter = letters[predicted_class[0]]
-
-        XTest_display = (XTest[0, :, :, 0] * 255).astype(np.uint8)  # float -> uint8
-        XTest_display = cv2.resize(XTest_display, (img.shape[1], img.shape[0]))  # opcjonalnie skalowanie
-        XTest_display = cv2.cvtColor(XTest_display, cv2.COLOR_GRAY2BGR)  # na 3 kanały BGR
-
-        cv2.putText(XTest_display, f"Class: {letter}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-        new_frame = VideoFrame.from_ndarray(XTest_display, format="bgr24")
-        new_frame.pts = frame.pts
-        new_frame.time_base = frame.time_base
-
-        return new_frame
-
-
-def parse_ice_candidate_string(candidate_string: str) -> dict:
-    """
-    Parse ICE candidate string to extract components.
-    Example: "candidate:842163049 1 udp 1677729535 192.168.1.2 54400 typ srflx..."
-    """
-    try:
-        parts = candidate_string.split()
-        if len(parts) < 8:
-            raise ValueError(f"Invalid candidate string: {candidate_string}")
-
-        # Parse basic components
-        foundation = parts[0].split(":")[1]  # "candidate:842163049" -> "842163049"
-        component = int(parts[1])
-        protocol = parts[2]
-        priority = int(parts[3])
-        ip = parts[4]
-        port = int(parts[5])
-        candidate_type = parts[7]  # after "typ"
-
-        return {
-            "foundation": foundation,
-            "component": component,
-            "protocol": protocol,
-            "priority": priority,
-            "ip": ip,
-            "port": port,
-            "type": candidate_type,
-        }
-    except Exception as e:
-        print(f"❌ Error parsing candidate string: {e}")
-        return {
-            "foundation": "0",
-            "component": 1,
-            "protocol": "udp",
-            "priority": 1,
-            "ip": "0.0.0.0",
-            "port": 9,
-            "type": "host",
-        }
-
-
-# ✅ HELPER FUNCTIONS
 async def send_ice_candidate(ws, client_id: str, candidate_dict):
     """Send ICE candidate to Spring WebSocket."""
     try:
@@ -233,6 +119,9 @@ async def handle_offer(ws, msg):
             # here can make manipulation on the track
             processed_track = VideoTransformTrack(track)
             pc.addTrack(processed_track)
+            
+            # used when no modification is needed            
+            # relay = MediaRelay()
             # relayed = relay.subscribe(track)
             # pc.addTrack(relayed)
             print(f"[{client_id}] added relayed local track (echo)")
@@ -290,42 +179,6 @@ async def handle_ice(msg):
         pending_ice.setdefault(client_id, []).append(cand_dict)
 
 
-async def add_ice_candidate_safe(
-    pc: RTCPeerConnection, client_id: str, cand_dict: dict
-):
-    """Safely add ICE candidate with proper error handling."""
-    try:
-        candidate_string = cand_dict.get("candidate")
-        sdp_mid = cand_dict.get("sdpMid")
-        sdp_mline_index = cand_dict.get("sdpMLineIndex")
-
-        if not candidate_string:
-            print(f"[{client_id}] ⚠️ Empty candidate string, skipping")
-            return
-
-        # Parse candidate string
-        parsed = parse_ice_candidate_string(candidate_string)
-
-        ice_candidate = RTCIceCandidate(
-            component=parsed["component"],
-            foundation=parsed["foundation"],
-            ip=parsed["ip"],
-            port=parsed["port"],
-            priority=parsed["priority"],
-            protocol=parsed["protocol"],
-            type=parsed["type"],
-            sdpMid=sdp_mid,
-            sdpMLineIndex=sdp_mline_index,
-        )
-
-        await pc.addIceCandidate(ice_candidate)
-        # print(
-        #     f"[{client_id}] ✅ ICE candidate added: {parsed['type']} {parsed['protocol']}"
-        # )
-
-    except Exception as e:
-        print(f"[{client_id}] ❌ addIceCandidate failed: {e}")
-
 
 async def handle_close(msg):
     """
@@ -338,10 +191,19 @@ async def handle_close(msg):
 
     pc = pcs.pop(client_id, None)
     if pc:
+        # stop wszystkie VideoTransformTrack, jeśli są
+        for sender in pc.getSenders():
+            track = sender.track
+            if isinstance(track, VideoTransformTrack):
+                try:
+                    await track.stop()  # <- zatrzymuje executor i taski
+                except Exception as e:
+                    print(f"[{client_id}] error stopping track: {e}")
         try:
             await pc.close()
         except Exception as e:
             print(f"[{client_id}] error closing pc: {e}")
+            
     pending_ice.pop(client_id, None)
     track_waiters.pop(client_id, None)
     print(f"[{client_id}] cleaned up")

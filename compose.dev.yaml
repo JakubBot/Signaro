@@ -66,6 +66,12 @@ services:
       - 8000:8000
     volumes:
       - ./ai/app:/app/app
+      - ./ai/requirements.txt:/app/requirements.txt
+    environment:
+      - WATCHFILES_FORCE_POLLING=1  # This forces file watching (solves issues with hot reloading on windows)
+      - WATCHFILES_POLLING_INTERVAL=1  # Check every 1 second
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/app
     networks:
       - app_network
     depends_on:
