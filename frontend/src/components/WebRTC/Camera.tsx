@@ -8,6 +8,7 @@ interface CameraProps {
   localWebcamRef: RefObject<HTMLVideoElement | null>;
   remoteWebcamRef: RefObject<HTMLVideoElement | null>;
   makeOffer: () => Promise<void>;
+  disconnect: () => Promise<void>;
   isConnected: boolean;
   error: string | null;
   cameraReady?: boolean;
@@ -17,6 +18,7 @@ const Camera = ({
   localWebcamRef,
   remoteWebcamRef,
   makeOffer,
+  disconnect,
   socketReady,
 }: CameraProps): JSX.Element => {
   return (
@@ -40,6 +42,12 @@ const Camera = ({
 
         <Button onClick={makeOffer} disabled={!socketReady}>
           Zrob polaczenie
+        </Button>
+        <Button
+          onClick={disconnect}
+          disabled={!socketReady}
+        >
+          Rozlacz
         </Button>
 
         <h2>Remote webcam</h2>

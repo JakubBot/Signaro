@@ -56,6 +56,7 @@ services:
         condition: service_healthy
 
   ai:
+    container_name: ai
     build:
       context: ./ai
       dockerfile: docker/dev.Dockerfile
@@ -87,6 +88,7 @@ services:
     # restart: unless-stopped
       
   db:
+    container_name: db
     image: 'postgres:17'
     restart: unless-stopped
     env_file:

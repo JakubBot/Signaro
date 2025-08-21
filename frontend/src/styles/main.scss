@@ -1,10 +1,12 @@
+@use "variables";
+@use "colors";
+@use "mixins";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import "variables";
-@import "colors";
-@import "mixins";
+
 
 html,
 body {

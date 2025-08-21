@@ -3,8 +3,14 @@ import useWebRtc from "@/hooks/useWebRtc";
 import { useRef, useState } from "react";
 
 const WebRtc = () => {
-  const { localWebcamRef, remoteWebcamRef, makeOffer, isConnected, error } =
-    useWebRtc();
+  const {
+    localWebcamRef,
+    remoteWebcamRef,
+    makeOffer,
+    isConnected,
+    error,
+    disconnect,
+  } = useWebRtc();
 
   return (
     <>
@@ -13,6 +19,7 @@ const WebRtc = () => {
         remoteWebcamRef={remoteWebcamRef}
         makeOffer={makeOffer}
         socketReady={isConnected}
+        disconnect={disconnect}
       />
     </>
   );

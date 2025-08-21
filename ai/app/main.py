@@ -13,6 +13,7 @@ from aiortc.contrib.media import MediaRelay
 from helpers.utils import add_ice_candidate_safe
 from video_transform_track import VideoTransformTrack
 from config import SIGNALING_URI, WAIT_FOR_TRACK_SECONDS, RECONNECT_DELAY_SECONDS
+import psutil
 
 app = FastAPI()
 
@@ -22,8 +23,6 @@ pcs: Dict[str, RTCPeerConnection] = {}  # clientId -> PeerConnection
 pending_ice: Dict[str, List[dict]] = {}  # clientId -> list of pending ICE candidates
 # Maps clientId -> asyncio.Future used to wait for first remote track
 track_waiters: Dict[str, asyncio.Future] = {}
-
-
 
 
 async def send_ice_candidate(ws, client_id: str, candidate_dict):
@@ -45,16 +44,16 @@ async def handle_offer(ws, msg):
     if not client_id:
         print("offer without 'from' -> ignoring")
         return
-
+    
     # Clean up existing pc for client if present
     if client_id in pcs:
-        try:
-            await pcs[client_id].close()
-        except Exception:
-            pass
+        old_pc = pcs[client_id]
+        await closeTracks(old_pc, client_id)
+
         pcs.pop(client_id, None)
         track_waiters.pop(client_id, None)
-
+        pending_ice.pop(client_id, None)
+        
     pc = RTCPeerConnection()
     pcs[client_id] = pc
 
@@ -90,8 +89,7 @@ async def handle_offer(ws, msg):
             w.set_result(track)
         # optional: spawn background task to read frames
         # asyncio.create_task(read_frames(client_id, track))
-
-
+    
     # parse sdp
     sdp_obj = msg.get("sdp")
     if isinstance(sdp_obj, dict):
@@ -119,8 +117,7 @@ async def handle_offer(ws, msg):
             # here can make manipulation on the track
             processed_track = VideoTransformTrack(track)
             pc.addTrack(processed_track)
-            
-            # used when no modification is needed            
+            # used when no modification is needed
             # relay = MediaRelay()
             # relayed = relay.subscribe(track)
             # pc.addTrack(relayed)
@@ -179,7 +176,6 @@ async def handle_ice(msg):
         pending_ice.setdefault(client_id, []).append(cand_dict)
 
 
-
 async def handle_close(msg):
     """
     Handle close request from Spring.
@@ -190,25 +186,41 @@ async def handle_close(msg):
         return
 
     pc = pcs.pop(client_id, None)
+    await closeTracks(pc, client_id)
+
+    pending_ice.pop(client_id, None)
+    track_waiters.pop(client_id, None)
+    print(f"[{client_id}] cleaned up")
+
+
+async def closeTracks(pc, client_id):
     if pc:
-        # stop wszystkie VideoTransformTrack, jeśli są
+        # stop all tracks
         for sender in pc.getSenders():
             track = sender.track
+            print(f"[{client_id}] 🔍 Track debug:")
+            print(f"  - track: {track}")
+            print(f"  - type: {type(track)}")
+            print(f"  - class name: {track.__class__.__name__}")
+            print(f"  - module: {track.__class__.__module__}")
+            print(
+                f"  - isinstance VideoTransformTrack: {isinstance(track, VideoTransformTrack)}"
+            )
+            print(f"  - VideoTransformTrack class: {VideoTransformTrack}")
             if isinstance(track, VideoTransformTrack):
                 try:
-                    await track.stop()  # <- zatrzymuje executor i taski
+                    print("before closing track")
+                    await track._stopVideoTransformTrack()  # <- stops executor and tasks
+                    print("after closing track")
                 except Exception as e:
                     print(f"[{client_id}] error stopping track: {e}")
         try:
             await pc.close()
         except Exception as e:
             print(f"[{client_id}] error closing pc: {e}")
-            
-    pending_ice.pop(client_id, None)
-    track_waiters.pop(client_id, None)
-    print(f"[{client_id}] cleaned up")
 
 
+# add to spring boot on websocket send event to close !!!
 async def signaling_client_loop():
     """
     Connect to Spring WebSocket and respond to messages forwarded from JS clients.
@@ -241,9 +253,35 @@ async def signaling_client_loop():
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
 
 
+# async def monitor_connections():
+#     """Monitor active peer connections continuously."""
+#     while True:
+#         print(f"\n{'='*50}")
+#         print(f"📊 SYSTEM MONITOR")
+#         print(f"{'='*50}")
+        
+#         # Global track stats
+#         VideoTransformTrack.print_global_stats()
+        
+#         # Connection stats
+#         print(f"\n🔗 CONNECTIONS: {len(pcs)}")
+#         for client_id, pc in pcs.items():
+#             print(f"  [{client_id}] State: {pc.connectionState}")
+        
+#         # Memory stats
+#         try:
+#             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+#             print(f"\n💾 MEMORY: {memory_mb:.1f} MB")
+#         except:
+#             pass
+            
+#         print(f"{'='*50}\n")
+#         await asyncio.sleep(5)
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(signaling_client_loop())
+    # asyncio.create_task(monitor_connections())  # Add monitoring task
 
 
 @app.get("/")

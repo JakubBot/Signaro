@@ -84,8 +84,46 @@ public class SignalingHandler extends TextWebSocketHandler {
         if (session.equals(pythonClient.get())) {
             pythonClient.set(null);
         } else {
-            jsClients.entrySet().removeIf(entry -> entry.getValue().equals(session));
+            String disconnectedClientId = findClientIdBySession(session);
+            if (disconnectedClientId != null) {
+                jsClients.remove(disconnectedClientId);
+
+                System.out.println("JS client disconnected: " + clientId + " (session: " + session.getId() + ")");
+                sendCloseNotificationToAI(disconnectedClientId);
+
+            }
         }
+    }
+
+    private void sendCloseNotificationToAI(String clientId) {
+        WebSocketSession python = pythonClient.get();
+        if (python == null || !python.isOpen()) {
+            System.err.println("Cannot send close notification - Python client not connected");
+            return;
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode closeMessage = mapper.createObjectNode();
+            closeMessage.put("type", "close");
+            closeMessage.put("from", clientId);
+
+            String jsonMessage = mapper.writeValueAsString(closeMessage);
+            python.sendMessage(new TextMessage(jsonMessage));
+
+        } catch (Exception e) {
+            System.err.println("Error sending close notification to AI: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private String findClientIdBySession(WebSocketSession session) {
+        for (Map.Entry<String, WebSocketSession> entry : jsClients.entrySet()) {
+            if (entry.getValue().equals(session)) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     public String addFromToPayload(String payload, String clientId) {

@@ -37,6 +37,10 @@ model, predict_fn = load_model_and_warmup("app/keras_model/model.keras")
 
 class VideoTransformTrack(MediaStreamTrack):
     kind = "video"
+    
+    _all_instances = []  # Lista wszystkich instancji
+    _instance_counter = 0  # Licznik dla ID
+    
 
     def __init__(self, track):
         super().__init__()
@@ -46,22 +50,70 @@ class VideoTransformTrack(MediaStreamTrack):
         self._tasks = set()
         self._executor = ThreadPoolExecutor(max_workers=MAX_INFERENCE_WORKERS)
         self._stopped = False
-
+        self._track_id = id(self)
+        
+       # ✅  TRACKING
+    #     VideoTransformTrack._instance_counter += 1
+    #     self._track_id = VideoTransformTrack._instance_counter
+    #     VideoTransformTrack._all_instances.append(self)
+        
+    #     self._print_stats("🆕 CREATED")
+        
+        
+    # def _print_stats(self, action=""):
+    #    """Print simple executor stats."""
+    #    active_count = len([t for t in VideoTransformTrack._all_instances if not t._stopped])
+    #    total_count = len(VideoTransformTrack._all_instances)
+       
+    #    print(f"[Track-{self._track_id}] {action}")
+    #    print(f"  📊 Active tracks: {active_count}/{total_count}")
+    #    print(f"  🔧 Executor shutdown: {self._executor._shutdown}")
+       
+    #    if hasattr(self._executor, '_threads'):
+    #        threads = len(self._executor._threads)
+    #        print(f"  🧵 Threads: {threads}")
+       
+    #    if hasattr(self._executor, '_work_queue'):
+    #        queue = self._executor._work_queue.qsize()
+    #        print(f"  📥 Queue: {queue}")
+       
+    #    print(f"  ⚡ Tasks: {len(self._tasks)}")
+        
+    # @classmethod
+    # def print_global_stats(cls):
+    #     """Print stats for all tracks."""
+    #     active = [t for t in cls._all_instances if not t._stopped]
+    #     total = len(cls._all_instances)
+        
+    #     print(f"\n📊 GLOBAL TRACK STATS:")
+    #     print(f"  Total tracks: {total}")
+    #     print(f"  Active tracks: {len(active)}")
+        
+    #     for track in active:
+    #         threads = len(track._executor._threads) if hasattr(track._executor, '_threads') else 0
+    #         queue = track._executor._work_queue.qsize() if hasattr(track._executor, '_work_queue') else 0
+    #         print(f"    Track-{track._track_id}: threads={threads}, queue={queue}, tasks={len(track._tasks)}")
+    
     async def recv(self):
-        if self._stopped:
-            print(f"🛑 Track stopped, returning None")
-            raise Exception("Track has been stopped")
-
         try:
+            if self._stopped:
+                print(f"🛑 Track stopped, returning None")
+                raise Exception("Track has been stopped")
+        
             frame = await self._track.recv()
             img = frame.to_ndarray(format="bgr24")
             self._counter += 1
 
             should_schedule = (
-                (self._counter % PROCESS_EVERY_N_FRAMES == 0)
-                or (self._latest_result is None)
-            ) and not self._stopped and (len(self._tasks) < MAX_INFERENCE_WORKERS)
+                (
+                    (self._counter % PROCESS_EVERY_N_FRAMES == 0)
+                    or (self._latest_result is None)
+                )
+                and not self._stopped
+                and (len(self._tasks) < MAX_INFERENCE_WORKERS)
+            )
             # schedule if its: not stopped, executor has free slots, its PROCESS_EVERY_N_FRAMES frame or there is no latest result
+
             if should_schedule:
                 XTest = self._preprocess_frame(img)
 
@@ -89,14 +141,57 @@ class VideoTransformTrack(MediaStreamTrack):
             new_frame.time_base = frame.time_base
             return new_frame
         except Exception as e:
-            if self._stopped:
-                print(f"🛑 Track stopped during processing: {e}")
-                return None
+            hasDisconnectError = self._hasDisconnectError(e)
 
-            print(f"ERROR in recv() frame {self._counter}: {e}")
-            print(f"Exception type: {type(e)}")
-            traceback.print_exc()
-            raise  # Re-raise to see full error
+            if hasDisconnectError:
+                print(f"[{self._track_id}] 🚨 CONNECTION LOST - Triggering emergency cleanup")
+                if not self._stopped:
+                    asyncio.create_task(self._emergency_cleanup())
+            
+            # ✅ ZAWSZE ZWRÓĆ None ZAMIAST RE-RAISE
+            return None
+
+    def _hasDisconnectError(self,e):
+        error_name = type(e).__name__
+        error_module = type(e).__module__
+        error_str = str(e)
+        
+        print(f"[{self._track_id}] ERROR in recv() frame {self._counter}:")
+        print(f"  - Error type: {error_name}")
+        print(f"  - Error module: {error_module}")
+        print(f"  - Error message: {error_str}")
+        print(f"  - Full error: {repr(e)}")
+        
+        connection_errors = [
+            "MediaStreamError",
+            "ConnectionError", 
+            "StreamError",
+            "InvalidStateError",
+            "RTCError"
+        ]
+        
+        is_connection_error = any(err in error_name for err in connection_errors)
+        is_disconnect_message = any(msg in error_str.lower() for msg in [
+            "track ended", 
+            "connection closed", 
+            "stream ended",
+            "peer connection closed"
+        ])
+        
+        print(f"  - Is connection error: {is_connection_error}")
+        print(f"  - Is disconnect message: {is_disconnect_message}")
+        return is_connection_error or is_disconnect_message
+
+    async def _emergency_cleanup(self):
+        """Emergency cleanup when connection is lost."""
+        if self._stopped:
+            return
+        print(f"[{self._track_id}] 🚨 EMERGENCY CLEANUP starting...")
+        try:
+            await self._stopVideoTransformTrack()
+            print(f"[{self._track_id}] ✅ EMERGENCY CLEANUP completed")
+        except Exception as e:
+            print(f"[{self._track_id}] ❌ EMERGENCY CLEANUP failed: {e}")
 
     def _preprocess_frame(self, img: np.ndarray) -> np.ndarray:
         gray = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2GRAY)
@@ -155,9 +250,14 @@ class VideoTransformTrack(MediaStreamTrack):
             print("Prediction error:", e)
             return None
 
-    async def stop(self):
+    async def _stopVideoTransformTrack(self):
+        if self._stopped:
+            print(f"[{self._track_id}] ⚠️ Already stopped")
+            return
+        
         self._stopped = True
-
+        print(f"[{self._track_id}] 🛑 Stopping VideoTransformTrack...")
+        
         tasks = list(self._tasks)
         for t in tasks:
             t.cancel()
@@ -175,3 +275,13 @@ class VideoTransformTrack(MediaStreamTrack):
 
         self._tasks.clear()
         self._latest_result = None
+
+
+    def __del__(self):
+        """Sprawdź czy obiekt jest poprawnie usuwany"""
+        hasExecutorActive = hasattr(self, "_executor") and not self._executor._shutdown
+        print(f"🗑️ Executor is active: {hasExecutorActive}")
+        if hasExecutorActive:
+            print(
+                f"⚠️ WARNING: Executor not properly shutdown in destructor!"
+            )

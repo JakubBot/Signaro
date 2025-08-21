@@ -5,6 +5,7 @@ interface UseWebRtcReturn {
   localWebcamRef: RefObject<HTMLVideoElement | null>;
   remoteWebcamRef: RefObject<HTMLVideoElement | null>;
   makeOffer: () => Promise<void>;
+  disconnect: () => Promise<void>;
   isConnected: boolean;
   error: string | null;
 }
@@ -219,10 +220,17 @@ const UseWebRtc = (): UseWebRtcReturn => {
     // });
   };
 
+  const disconnect = async () => {
+    await wsRef.current?.send(
+      JSON.stringify({ type: "close", from: "a89das687cz" })
+    );
+  };
+
   return {
     localWebcamRef,
     remoteWebcamRef,
     makeOffer,
+    disconnect,
     isConnected,
     error,
   };
