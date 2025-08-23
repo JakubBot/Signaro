@@ -73,6 +73,12 @@ services:
       - WATCHFILES_POLLING_INTERVAL=1  # Check every 1 second
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app/app
+
+      # ✅ GPU environment variables
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # ✅ Force TensorFlow to use GPU
+      - CUDA_VISIBLE_DEVICES=0
     networks:
       - app_network
     depends_on:

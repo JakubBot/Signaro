@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Dict, List
 
+from helpers.app_analysis import monitoring_task
 import websockets
 from fastapi import FastAPI
 from aiortc import (
@@ -11,19 +12,16 @@ from aiortc import (
 )
 from aiortc.contrib.media import MediaRelay
 from helpers.utils import add_ice_candidate_safe
-from video_transform_track import VideoTransformTrack
+from video_transform_track import VideoTransformTrack,cleanup_global_resources
 from config import SIGNALING_URI, WAIT_FOR_TRACK_SECONDS, RECONNECT_DELAY_SECONDS
-import psutil
 
 app = FastAPI()
-
 
 # Global state
 pcs: Dict[str, RTCPeerConnection] = {}  # clientId -> PeerConnection
 pending_ice: Dict[str, List[dict]] = {}  # clientId -> list of pending ICE candidates
 # Maps clientId -> asyncio.Future used to wait for first remote track
 track_waiters: Dict[str, asyncio.Future] = {}
-
 
 async def send_ice_candidate(ws, client_id: str, candidate_dict):
     """Send ICE candidate to Spring WebSocket."""
@@ -44,7 +42,7 @@ async def handle_offer(ws, msg):
     if not client_id:
         print("offer without 'from' -> ignoring")
         return
-    
+
     # Clean up existing pc for client if present
     if client_id in pcs:
         old_pc = pcs[client_id]
@@ -53,7 +51,7 @@ async def handle_offer(ws, msg):
         pcs.pop(client_id, None)
         track_waiters.pop(client_id, None)
         pending_ice.pop(client_id, None)
-        
+
     pc = RTCPeerConnection()
     pcs[client_id] = pc
 
@@ -89,7 +87,7 @@ async def handle_offer(ws, msg):
             w.set_result(track)
         # optional: spawn background task to read frames
         # asyncio.create_task(read_frames(client_id, track))
-    
+
     # parse sdp
     sdp_obj = msg.get("sdp")
     if isinstance(sdp_obj, dict):
@@ -145,7 +143,6 @@ async def handle_offer(ws, msg):
     }
     await ws.send(json.dumps(out))
     print(f"[{client_id}] answer sent")
-
 
 
 async def handle_ice(msg):
@@ -259,30 +256,36 @@ async def signaling_client_loop():
 #         print(f"\n{'='*50}")
 #         print(f"📊 SYSTEM MONITOR")
 #         print(f"{'='*50}")
-        
+
 #         # Global track stats
 #         VideoTransformTrack.print_global_stats()
-        
+
 #         # Connection stats
 #         print(f"\n🔗 CONNECTIONS: {len(pcs)}")
 #         for client_id, pc in pcs.items():
 #             print(f"  [{client_id}] State: {pc.connectionState}")
-        
+
 #         # Memory stats
 #         try:
 #             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
 #             print(f"\n💾 MEMORY: {memory_mb:.1f} MB")
 #         except:
 #             pass
-            
+
 #         print(f"{'='*50}\n")
 #         await asyncio.sleep(5)
+
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(signaling_client_loop())
-    # asyncio.create_task(monitor_connections())  # Add monitoring task
+    asyncio.create_task(monitoring_task())  # Add monitoring task
 
+
+# @app.on_event("shutdown")
+# async def shutdown_event():
+    # CLEANUP GLOBAL RESOURCES
+    # cleanup_global_resources()
 
 @app.get("/")
 async def check_status():
