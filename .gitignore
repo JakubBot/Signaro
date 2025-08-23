@@ -83,7 +83,27 @@ next-env.d.ts
 
 
 # AI
-ai/app/__pycache__
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+ai/build/
+ai/develop-eggs/
+ai/dist/
+ai/downloads/
+ai/eggs/
+ai/.eggs/
+ai/lib/
+ai/lib64/
+ai/parts/
+ai/sdist/
+ai/var/
+ai/wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 
 # General

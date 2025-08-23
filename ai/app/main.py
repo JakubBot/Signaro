@@ -282,10 +282,10 @@ async def startup_event():
     asyncio.create_task(monitoring_task())  # Add monitoring task
 
 
-# @app.on_event("shutdown")
-# async def shutdown_event():
+@app.on_event("shutdown")
+async def shutdown_event():
     # CLEANUP GLOBAL RESOURCES
-    # cleanup_global_resources()
+    cleanup_global_resources()
 
 @app.get("/")
 async def check_status():

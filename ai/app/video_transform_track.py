@@ -24,6 +24,8 @@ _global_executor = None
 _thread_local = threading.local()
 _resource_monitor = ResourceMonitor()
 
+_all_holistic_instances = []
+_instances_lock = threading.Lock()
 
 def get_global_executor():
     global _global_executor
@@ -34,12 +36,11 @@ def get_global_executor():
     return _global_executor
 
 
-
 def get_thread_holistic():
     """Get MediaPipe instance for current thread with resource monitoring"""
     if not hasattr(_thread_local, "holistic"):
 
-        # ✅ CHECK RESOURCE AVAILABILITY
+        # Check resource availability
         if not _resource_monitor.can_create_instance():
             print("⚠️ Resource limit reached, falling back to shared processing")
             return None
@@ -48,6 +49,10 @@ def get_thread_holistic():
             _thread_local.holistic = mp_holistic.Holistic(
                 min_detection_confidence=0.5, min_tracking_confidence=0.5
             )
+
+            # Register instance globally
+            with _instances_lock:
+                _all_holistic_instances.append(_thread_local.holistic)
             _resource_monitor.instance_created()
 
         except Exception as e:
@@ -99,21 +104,6 @@ def draw_styled_landmarks(image, results):
         )
 
 
-def cleanup_global_resources():
-    global _global_executor
-
-    if _global_executor:
-        _global_executor.shutdown(wait=True)
-        _global_executor = None
-
-    try:
-        if hasattr(_thread_local, "holistic"):
-            _thread_local.holistic.close()
-            delattr(_thread_local, "holistic")
-            _resource_monitor.instance_destroyed()
-    except Exception as e:
-        print(f"Global cleanup error: {e}")
-
 
 class VideoTransformTrack(MediaStreamTrack):
     kind = "video"
@@ -161,7 +151,7 @@ class VideoTransformTrack(MediaStreamTrack):
 
     def _sync_predict(self, img):
         try:
-            # thread safety
+            # Thread safety
             holistic = get_thread_holistic()
             if holistic is None:  # Resource limit reached
                 return img  # Return original frame
@@ -180,7 +170,44 @@ class VideoTransformTrack(MediaStreamTrack):
             t.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
-        # loop = asyncio.get_running_loop()
-        # await loop.run_in_executor(None, self._executor.shutdown, True)
+
         self._tasks.clear()
         self._latest_result = None
+
+
+def cleanup_global_resources():
+    """Cleanup that handles ALL instances"""
+    global _global_executor
+    
+    # Cleanup executor
+    if _global_executor:
+        try:
+            _global_executor.shutdown(wait=True)
+        except Exception as e:
+            print(f"⚠️ ThreadPoolExecutor error: {e}")
+        finally:
+            _global_executor = None
+
+    # Cleanup all mediapipe instances
+    cleanup_count = 0
+    with _instances_lock:
+        instances_to_cleanup = list(_all_holistic_instances)
+        _all_holistic_instances.clear()
+    
+    for instance in instances_to_cleanup:
+        try:
+            instance.close()
+            cleanup_count += 1
+        except Exception as e:
+            print(f"⚠️ Instance cleanup error: {e}")
+
+    # Cleanup current thread-local
+    try:
+        if hasattr(_thread_local, "holistic"):
+            delattr(_thread_local, "holistic")
+    except Exception as e:
+        print(f"⚠️ Thread-local cleanup error: {e}")
+
+    # Reset resource monitor
+    _resource_monitor.instance_count = 0
+    
