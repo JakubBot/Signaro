@@ -5,7 +5,7 @@ from constant.main import MAX_INFERENCE_WORKERS
 class ResourceMonitor:
     def __init__(self):
         self.instance_count = 0
-        self.max_instances = MAX_INFERENCE_WORKERS + 1  # Allow 1 extra
+        self.max_instances = MAX_INFERENCE_WORKERS  # Allow 1 extra
         self.lock = threading.Lock()
 
     def can_create_instance(self):

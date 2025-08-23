@@ -9,9 +9,8 @@ interface CameraProps {
   remoteWebcamRef: RefObject<HTMLVideoElement | null>;
   makeOffer: () => Promise<void>;
   disconnect: () => Promise<void>;
-  isConnected: boolean;
-  error: string | null;
-  cameraReady?: boolean;
+  error?: string | null;
+  readyWebRtcConnect?: boolean;
 }
 
 const Camera = ({
@@ -19,7 +18,7 @@ const Camera = ({
   remoteWebcamRef,
   makeOffer,
   disconnect,
-  socketReady,
+  readyWebRtcConnect,
 }: CameraProps): JSX.Element => {
   return (
     <>
@@ -40,15 +39,8 @@ const Camera = ({
           }}
         ></video>
 
-        <Button onClick={makeOffer} disabled={!socketReady}>
-          Zrob polaczenie
-        </Button>
-        <Button
-          onClick={disconnect}
-          disabled={!socketReady}
-        >
-          Rozlacz
-        </Button>
+        <Button onClick={makeOffer} disabled={!readyWebRtcConnect}>Zrob polaczenie</Button>
+        <Button onClick={disconnect} disabled={readyWebRtcConnect}>Rozlacz</Button>
 
         <h2>Remote webcam</h2>
         <video

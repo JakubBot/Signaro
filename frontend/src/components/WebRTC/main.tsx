@@ -7,9 +7,9 @@ const WebRtc = () => {
     localWebcamRef,
     remoteWebcamRef,
     makeOffer,
-    isConnected,
     error,
     disconnect,
+    readyWebRtcConnect,
   } = useWebRtc();
 
   return (
@@ -18,8 +18,8 @@ const WebRtc = () => {
         localWebcamRef={localWebcamRef}
         remoteWebcamRef={remoteWebcamRef}
         makeOffer={makeOffer}
-        socketReady={isConnected}
         disconnect={disconnect}
+        readyWebRtcConnect={readyWebRtcConnect}
       />
     </>
   );

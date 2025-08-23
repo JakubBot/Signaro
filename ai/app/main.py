@@ -195,20 +195,20 @@ async def closeTracks(pc, client_id):
         # stop all tracks
         for sender in pc.getSenders():
             track = sender.track
-            print(f"[{client_id}] 🔍 Track debug:")
-            print(f"  - track: {track}")
-            print(f"  - type: {type(track)}")
-            print(f"  - class name: {track.__class__.__name__}")
-            print(f"  - module: {track.__class__.__module__}")
-            print(
-                f"  - isinstance VideoTransformTrack: {isinstance(track, VideoTransformTrack)}"
-            )
-            print(f"  - VideoTransformTrack class: {VideoTransformTrack}")
+            # print(f"[{client_id}] 🔍 Track debug:")
+            # print(f"  - track: {track}")
+            # print(f"  - type: {type(track)}")
+            # print(f"  - class name: {track.__class__.__name__}")
+            # print(f"  - module: {track.__class__.__module__}")
+            # print(
+            #     f"  - isinstance VideoTransformTrack: {isinstance(track, VideoTransformTrack)}"
+            # )
+            # print(f"  - VideoTransformTrack class: {VideoTransformTrack}")
             if isinstance(track, VideoTransformTrack):
                 try:
-                    print("before closing track")
+                    # print("before closing track")
                     await track._stopVideoTransformTrack()  # <- stops executor and tasks
-                    print("after closing track")
+                    # print("after closing track")
                 except Exception as e:
                     print(f"[{client_id}] error stopping track: {e}")
         try:
@@ -250,42 +250,16 @@ async def signaling_client_loop():
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
 
 
-# async def monitor_connections():
-#     """Monitor active peer connections continuously."""
-#     while True:
-#         print(f"\n{'='*50}")
-#         print(f"📊 SYSTEM MONITOR")
-#         print(f"{'='*50}")
-
-#         # Global track stats
-#         VideoTransformTrack.print_global_stats()
-
-#         # Connection stats
-#         print(f"\n🔗 CONNECTIONS: {len(pcs)}")
-#         for client_id, pc in pcs.items():
-#             print(f"  [{client_id}] State: {pc.connectionState}")
-
-#         # Memory stats
-#         try:
-#             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-#             print(f"\n💾 MEMORY: {memory_mb:.1f} MB")
-#         except:
-#             pass
-
-#         print(f"{'='*50}\n")
-#         await asyncio.sleep(5)
-
-
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(signaling_client_loop())
-    asyncio.create_task(monitoring_task())  # Add monitoring task
+    # asyncio.create_task(monitoring_task())  # Add monitoring task
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
+# @app.on_event("shutdown")
+# async def shutdown_event():
     # CLEANUP GLOBAL RESOURCES
-    cleanup_global_resources()
+    # cleanup_global_resources()
 
 @app.get("/")
 async def check_status():
