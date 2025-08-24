@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
    outputFileTracingIncludes: {
      "/": ["./public/**/*"],
    },
+
+  compiler: {
+    emotion: true,
+  },
 };
 
 export default nextConfig;

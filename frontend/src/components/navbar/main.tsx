@@ -1,8 +1,10 @@
 import styled from "@emotion/styled";
 import { colorPalette } from "@/components/ui/colorPalette";
 import { FaSignLanguage } from "react-icons/fa";
+import { MdOutlineSignLanguage } from "react-icons/md";
 
 import { Button } from "@/components/ui/button";
+import BrandLogo from "../ui/BrandLogo";
 
 const NavbarWrapperStyles = styled.div`
   display: flex;
@@ -17,10 +19,7 @@ const Navbar = () => {
   return (
     <>
       <NavbarWrapperStyles>
-        <Button variant="ghost">
-          <FaSignLanguage /> Signaro
-        </Button>
-
+        <BrandLogo />
         <nav></nav>
       </NavbarWrapperStyles>
     </>
