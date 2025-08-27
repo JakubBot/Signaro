@@ -8,6 +8,7 @@
 
 
 
+
 html,
 body {
   max-width: 100vw;
@@ -92,6 +93,12 @@ a {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+}
+
+:root {
+  --light-gray: $light-gray;
+  --medium-gray: $medium-gray;
+  --dark-gray: $dark-gray;
 }
 
 

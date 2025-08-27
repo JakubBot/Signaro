@@ -22,11 +22,7 @@ const Camera = ({
 }: CameraProps): JSX.Element => {
   return (
     <>
-      <div
-        className={clsx(css`
-          background: ${colorPalette.lightGray};
-        `)}
-      >
+      <div>
         <h2>Local webcam</h2>
         <video
           ref={localWebcamRef}
@@ -39,8 +35,12 @@ const Camera = ({
           }}
         ></video>
 
-        <Button onClick={makeOffer} disabled={!readyWebRtcConnect}>Zrob polaczenie</Button>
-        <Button onClick={disconnect} disabled={readyWebRtcConnect}>Rozlacz</Button>
+        <Button onClick={makeOffer} disabled={!readyWebRtcConnect}>
+          Zrob polaczenie
+        </Button>
+        <Button onClick={disconnect} disabled={readyWebRtcConnect}>
+          Rozlacz
+        </Button>
 
         <h2>Remote webcam</h2>
         <video
