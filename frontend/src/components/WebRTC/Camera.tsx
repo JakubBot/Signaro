@@ -2,59 +2,63 @@ import { JSX, RefObject } from "react";
 import { clsx } from "clsx";
 import { css } from "@emotion/react";
 import { colorPalette } from "@/components/ui/colorPalette";
-import { Button } from "@/components/ui/button";
-// import { signIcon } from "@/constants/icons";
+import { Button } from "@/components/ui/shadcn/button";
+import { typography } from "@/components/ui/typography";
+import ContentWrapper from "@/components/ui/ContentWrapper";
+import { cameraSize } from "@/constants/webrtc";
+
 interface CameraProps {
   localWebcamRef: RefObject<HTMLVideoElement | null>;
   remoteWebcamRef: RefObject<HTMLVideoElement | null>;
-  makeOffer: () => Promise<void>;
-  disconnect: () => Promise<void>;
   error?: string | null;
-  readyWebRtcConnect?: boolean;
+  title?: string;
 }
 
 const Camera = ({
   localWebcamRef,
   remoteWebcamRef,
-  makeOffer,
-  disconnect,
-  readyWebRtcConnect,
+  title,
 }: CameraProps): JSX.Element => {
   return (
-    <>
-      <div>
-        <h2>Local webcam</h2>
+    <div>
+      <ContentWrapper gap="5px" direction="column">
+        <h4 css={typography.textL}>{title || "Local webcam"}</h4>
         <video
           ref={localWebcamRef}
           id="localWebcam"
           autoPlay
           playsInline
-          style={{
-            width: "320px",
-            height: "240px",
-          }}
+          css={css`
+            border-radius: var(--radius);
+            width: ${cameraSize.width}px;
+            height: ${cameraSize.height}px;
+            background-color: black;
+          `}
         ></video>
+      </ContentWrapper>
 
-        <Button onClick={makeOffer} disabled={!readyWebRtcConnect}>
-          Zrob polaczenie
-        </Button>
-        <Button onClick={disconnect} disabled={readyWebRtcConnect}>
-          Rozlacz
-        </Button>
-
+      {/* <div
+        css={css`
+          position: absolute;
+          bottom: 10px;
+          right: 10px;
+        `}
+      >
+        ONLY IN DEV
         <h2>Remote webcam</h2>
         <video
           ref={remoteWebcamRef}
           id="remoteWebcam"
           autoPlay
           playsInline
-          style={{
-            width: "320px",
-            height: "240px",
-          }}
+          css={css`
+            width: 400px;
+            height: auto;
+            background-color: black;
+          `}
         ></video>
-      </div>
-    </>
+      </div> */}
+    </div>
   );
 };
 

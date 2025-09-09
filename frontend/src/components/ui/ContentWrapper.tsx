@@ -10,7 +10,11 @@ const ContentWrapper = ({
   width,
   height,
   gap,
-  direction,
+  direction = "row",
+  maxWidth,
+  flex,
+  borderRadius,
+  backgroundColor,
   onClick,
 }: {
   children: React.ReactNode;
@@ -23,6 +27,10 @@ const ContentWrapper = ({
   height?: string;
   gap?: string;
   direction?: "row" | "column";
+  maxWidth?: string;
+  flex?: true;
+  backgroundColor?: string;
+  borderRadius?: string;
   onClick?: () => void;
 }) => {
   return (
@@ -35,11 +43,14 @@ const ContentWrapper = ({
     ${padding ? `padding: ${padding};` : ""}
     ${margin ? `margin: ${margin};` : ""}
     ${width ? `width: ${width};` : ""}
+    ${maxWidth ? `max-width: ${maxWidth};` : ""}
     ${height ? `height: ${height};` : ""}
     ${gap ? `gap: ${gap};` : ""}
     ${direction ? `flex-direction: ${direction};` : ""}
+    ${borderRadius ? `border-radius: ${borderRadius};` : ""}
+    ${backgroundColor ? `background-color: ${backgroundColor};` : ""}
 
-    ${align || justify ? `display: flex;` : ""}
+    ${align || justify || flex || gap || direction ? `display: flex;` : ""}
       `}
     >
       {children}

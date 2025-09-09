@@ -1,4 +1,4 @@
-const servers = {
+export const servers = {
   iceServers: [
     {
       urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
@@ -8,4 +8,9 @@ const servers = {
   iceCandidatePoolSize: 4,
 };
 
-export default servers;
+
+export const cameraSize = {
+  width: 440,
+  height: 330,
+}
+

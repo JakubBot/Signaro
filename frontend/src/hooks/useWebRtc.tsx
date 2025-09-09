@@ -1,4 +1,4 @@
-import servers from "@/constants/webrtc";
+import { servers } from "@/constants/webrtc";
 import { RefObject, useEffect, useRef, useState } from "react";
 
 interface UseWebRtcReturn {
@@ -167,7 +167,7 @@ const UseWebRtc = (): UseWebRtcReturn => {
   };
 
   const disconnect = async () => {
-      try {
+    try {
       // ✅ 1. Send close message and wait for delivery
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(

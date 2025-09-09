@@ -7,8 +7,8 @@ import {
   SheetDescription,
   SheetFooter,
   SheetClose,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+} from "@/components/ui/shadcn/sheet";
+import { Button } from "@/components/ui/shadcn/button";
 import React from "react";
 import { css } from "@emotion/react";
 import ContentWrapper from "@/components/ui/ContentWrapper";
