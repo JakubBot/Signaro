@@ -3,16 +3,18 @@ import { colorPalette } from "@/components/ui/colorPalette";
 import { FaSignLanguage } from "react-icons/fa";
 import { MdOutlineSignLanguage } from "react-icons/md";
 
-import { Button } from "@/components/ui/button";
 import BrandLogo from "../ui/BrandLogo";
+import MenuHamburger from "@/components/navbar/MenuHamburger";
+import ContentWrapper from "@/components/ui/ContentWrapper";
 
 const NavbarWrapperStyles = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background-color: ${colorPalette.darkGray};
-  min-height: 70px;
+  padding: 0 20px;
+  height: 60px;
+
+  border-bottom: 1px solid ${colorPalette.border};
 `;
 
 const Navbar = () => {
@@ -20,7 +22,11 @@ const Navbar = () => {
     <>
       <NavbarWrapperStyles>
         <BrandLogo />
+
         <nav></nav>
+        <ContentWrapper align="center" gap="25px">
+          <MenuHamburger />
+        </ContentWrapper>
       </NavbarWrapperStyles>
     </>
   );

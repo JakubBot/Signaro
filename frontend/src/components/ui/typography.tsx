@@ -27,19 +27,19 @@ export const typography = {
   `,
   textL: css`
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 24px;
     letter-spacing: 0;
   `,
   textM: css`
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 400;
     line-height: 120%;
     letter-spacing: 0;
   `,
   textS: css`
     font-style: normal;
-    font-weight: 500;
+    font-weight: 400;
     font-size: 12px;
     line-height: 24px;
   `,

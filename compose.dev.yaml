@@ -24,94 +24,94 @@ services:
       - 3000:3000
     networks:
       - app_network
-    depends_on:
-      backend:
-        condition: service_healthy
+    # depends_on:
+      # backend:
+        # condition: service_healthy
     
-  backend:
-    container_name: backend
-    build:
-      context: ./backend
-      dockerfile: docker/dev.Dockerfile
-    env_file:
-      - .env
-      - .env.dev.local
-    ports:
-      - 8080:8080
-    # environment:
-    # - SPRING_PROFILES_ACTIVE=dev
-    volumes:
-      - ./backend:/app
-      - ~/.m2:/root/.m2
-    networks:
-      - app_network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      retries: 10
-      start_period: 30s
-      timeout: 5s
-    depends_on:
-      db:
-        condition: service_healthy
+  # backend:
+  #   container_name: backend
+  #   build:
+  #     context: ./backend
+  #     dockerfile: docker/dev.Dockerfile
+  #   env_file:
+  #     - .env
+  #     - .env.dev.local
+  #   ports:
+  #     - 8080:8080
+  #   # environment:
+  #   # - SPRING_PROFILES_ACTIVE=dev
+  #   volumes:
+  #     - ./backend:/app
+  #     - ~/.m2:/root/.m2
+  #   networks:
+  #     - app_network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+  #     interval: 10s
+  #     retries: 10
+  #     start_period: 30s
+  #     timeout: 5s
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
-  ai:
-    container_name: ai
-    build:
-      context: ./ai
-      dockerfile: docker/dev.Dockerfile
-    env_file:
-        - .env
-        - .env.dev.local
-    ports:
-      - 8000:8000
-    volumes:
-      - ./ai/app:/app/app
-      - ./ai/requirements.txt:/app/requirements.txt
-    environment:
-      - WATCHFILES_FORCE_POLLING=1  # This forces file watching (solves issues with hot reloading on windows)
-      - WATCHFILES_POLLING_INTERVAL=1  # Check every 1 second
-      - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app/app
+  # ai:
+  #   container_name: ai
+  #   build:
+  #     context: ./ai
+  #     dockerfile: docker/dev.Dockerfile
+  #   env_file:
+  #       - .env
+  #       - .env.dev.local
+  #   ports:
+  #     - 8000:8000
+  #   volumes:
+  #     - ./ai/app:/app/app
+  #     - ./ai/requirements.txt:/app/requirements.txt
+  #   environment:
+  #     - WATCHFILES_FORCE_POLLING=1  # This forces file watching (solves issues with hot reloading on windows)
+  #     - WATCHFILES_POLLING_INTERVAL=1  # Check every 1 second
+  #     - PYTHONUNBUFFERED=1
+  #     - PYTHONPATH=/app/app
 
-      # ✅ GPU environment variables
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      # ✅ Force TensorFlow to use GPU
-      - CUDA_VISIBLE_DEVICES=0
-    networks:
-      - app_network
-    depends_on:
-      backend:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
-    # restart: unless-stopped
+  #     # ✅ GPU environment variables
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  #     # ✅ Force TensorFlow to use GPU
+  #     - CUDA_VISIBLE_DEVICES=0
+  #   networks:
+  #     - app_network
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [ gpu ]
+  #   # restart: unless-stopped
       
-  db:
-    container_name: db
-    image: 'postgres:17'
-    restart: unless-stopped
-    env_file:
-      - .env
-      - .env.dev.local
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 10s
-      retries: 10
-      timeout: 5s
+  # db:
+  #   container_name: db
+  #   image: 'postgres:17'
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #     - .env.dev.local
+  #   healthcheck:
+  #     test: ["CMD", "pg_isready", "-U", "postgres"]
+  #     interval: 10s
+  #     retries: 10
+  #     timeout: 5s
 
-    ports:
-      - '5432:5432'
-    volumes:
-      - "pgdata:/var/lib/postgresql/data"
-    networks:
-      - app_network
+  #   ports:
+  #     - '5432:5432'
+  #   volumes:
+  #     - "pgdata:/var/lib/postgresql/data"
+  #   networks:
+  #     - app_network
 
 volumes:
   pgdata:

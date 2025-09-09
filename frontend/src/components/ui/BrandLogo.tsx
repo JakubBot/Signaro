@@ -2,6 +2,9 @@
 import { MdOutlineSignLanguage } from "react-icons/md";
 import { typography } from "@/components/ui/typography";
 import { css } from "@emotion/react";
+import IconWrapper from "@/components/ui/IconWrapper";
+import ContentWrapper from "@/components/ui/ContentWrapper";
+import { colorPalette } from "./colorPalette";
 
 interface BrandLogoProps {
   onClick?: () => void;
@@ -9,18 +12,10 @@ interface BrandLogoProps {
 
 const BrandLogo = ({ onClick }: BrandLogoProps) => {
   return (
-    <div onClick={onClick} className="flex items-center gap-4">
-      <MdOutlineSignLanguage size={20} />
-      <span
-        css={[
-          typography.textM,
-          css`
-          `,
-        ]}
-      >
-        Signaro
-      </span>
-    </div>
+    <ContentWrapper onClick={onClick} align="center" gap="10px">
+      <IconWrapper Icon={MdOutlineSignLanguage} />
+      <span css={[typography.textXl, css``]}>Signaro</span>
+    </ContentWrapper>
   );
 };
 

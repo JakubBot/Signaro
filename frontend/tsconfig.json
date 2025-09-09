@@ -14,7 +14,7 @@
     "jsx": "preserve",
     "incremental": true,
     "jsxImportSource": "@emotion/react",
-
+    "baseUrl": ".", 
     "plugins": [
       {
         "name": "next"
